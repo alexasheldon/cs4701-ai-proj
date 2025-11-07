@@ -3,3 +3,4 @@ torch>=?
 torchvision>=?
 kagglehub>=?
 matplotlib>=?
+tqdm>=?
