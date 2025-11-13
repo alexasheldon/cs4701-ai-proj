@@ -12,7 +12,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.optim as optim 
-
+#from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 # Load Data
 def download_dataset():
@@ -24,9 +24,9 @@ def download_dataset():
 def preprocess_dataset(path):
     # Initialize transformation: format as tensor, normalize
     transform_tr = transforms.Compose([
-        transforms.RandomRotation(15), # new transform
-        transforms.ColorJitter(brightness=0.2, contrast=0.2), # new transform
-        transforms.RandomGrayscale(p=0.1), # new transform
+        transforms.RandomRotation(15), # randomly rotates some images by up to 15 degrees
+        transforms.ColorJitter(brightness=0.2, contrast=0.2), # randomly changes the brightness, contrast, saturation, and hue of an image
+        transforms.RandomGrayscale(p=0.1), # randomly grayscales some images
         transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)), # new transform
         transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)), # new transform
         transforms.ToTensor(),
@@ -80,22 +80,20 @@ def preprocess_dataset(path):
     return dat
 
 # test-train-val split
-def test_train_split(dat):
+def test_train_split(dat, BATCH_SIZE=64):
 
     len(dat.targets) == len(dat.samples) and len(dat.targets) == len(dat.imgs) and len(dat.imgs) == len(dat) and len(dat) == 900*25
     len(dat.classes) == 25
     # Split data
     ratio_tr = 0.8
-    ratio_val = 0.2
+    #ratio_val = 0.2
 
     size_tr = int(len(dat) * ratio_tr)
     size_val = len(dat) - size_tr
 
     dat_tr, dat_val = random_split(dat, [size_tr, size_val])
 
-    BATCH_SIZE = 64
-
-    # Load image data from folder
+    # Load image data from folder with some going into training and some to validation
     loader_tr = DataLoader(dat_tr, batch_size=BATCH_SIZE, shuffle=True)
     loader_val = DataLoader(dat_val, batch_size=BATCH_SIZE, shuffle = False)
 
@@ -159,8 +157,6 @@ def train_model(conv_model, loader_tr, num_epochs=2):
 
 # Evaluate Model
 def evaluate_model(conv_model, loader_tr, loader_val, dat, mode="Validation"):
-
-    # Train data
     correct = 0
     total = 0
 
@@ -175,41 +171,7 @@ def evaluate_model(conv_model, loader_tr, loader_val, dat, mode="Validation"):
 
     print(f"{mode} Accuracy: " + str(correct / total))
 
-
-def main():
-    path = download_dataset()
-    dat = preprocess_dataset(path)
-    loader_tr, loader_val = test_train_split(dat)
-    conv_model = initialize_model(num_classes=len(dat.classes))
-    train_model(conv_model, loader_tr, num_epochs=2)
-    evaluate_model(conv_model, loader_tr, loader_val, dat, mode="Training")
-    evaluate_model(conv_model, loader_tr, loader_val, dat, mode="Validation")
-
-    print("\nCaclulating per-class accuracy:\n")
-    per_class_accuracy(dat, loader_val, conv_model)
-
-if __name__ == "__main__":
-    main()
-
-# # Validation data
-# correct = 0
-# total = 0
-
-# for i, data in tqdm(enumerate(loader_val)):
-#     images, labels = data
-
-#     outputs = conv_model(images)
-#     _, predicted = torch.max(outputs, 1)
-
-#     correct += (predicted == labels).sum().item()
-#     total += labels.shape[0]
-
-# print("Accuracy: " + str(correct / total))
-
-# # Create reverse mapping
-# reverse_map = {dat.class_to_idx[c]: c for c in dat.class_to_idx.keys()}
-
-# # Per class accuracy
+# Per class accuracy
 def per_class_accuracy(dat, loader_val, conv_model):
     reverse_map = {dat.class_to_idx[c]: c for c in dat.class_to_idx.keys()}
     correct = {c:0 for c in dat.classes}
@@ -234,5 +196,24 @@ def per_class_accuracy(dat, loader_val, conv_model):
     
     return class_accuracy
 
+# def plot_confusion_matrix(true_labels, pred_labels, class_names):
+#     cm = confusion_matrix(true_labels, pred_labels)
+#     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
+#     disp.plot(cmap=plt.cm.Blues)
+#     plt.show()
 
 
+def main():
+    path = download_dataset()
+    dat = preprocess_dataset(path)
+    loader_tr, loader_val = test_train_split(dat)
+    conv_model = initialize_model(num_classes=len(dat.classes))
+    train_model(conv_model, loader_tr, num_epochs=2)
+    evaluate_model(conv_model, loader_tr, loader_val, dat, mode="Training")
+    evaluate_model(conv_model, loader_tr, loader_val, dat, mode="Validation")
+
+    print("\nCaclulating per-class accuracy:\n")
+    per_class_accuracy(dat, loader_val, conv_model)
+
+if __name__ == "__main__":
+    main()
