@@ -24,11 +24,11 @@ def download_dataset():
 def preprocess_dataset(path):
     # Initialize transformation: format as tensor, normalize
     transform_tr = transforms.Compose([
-        transforms.RandomRotation(15), # randomly rotates some images by up to 15 degrees
-        transforms.ColorJitter(brightness=0.2, contrast=0.2), # randomly changes the brightness, contrast, saturation, and hue of an image
-        transforms.RandomGrayscale(p=0.1), # randomly grayscales some images
-        transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)), # new transform
-        transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)), # new transform
+        #transforms.RandomRotation(15), # randomly rotates some images by up to 15 degrees
+        #transforms.ColorJitter(brightness=0.2, contrast=0.2), # randomly changes the brightness, contrast, saturation, and hue of an image
+        #transforms.RandomGrayscale(p=0.1), # randomly grayscales some images
+        #transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)), # new transform
+        #transforms.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)), # new transform
         transforms.ToTensor(),
         transforms.Normalize(
             mean=[0.5, 0.5, 0.5],
