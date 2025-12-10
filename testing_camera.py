@@ -19,6 +19,8 @@ MIN_SEG_FRAMES = 6
 CAL_INTERVAL = 5  # seconds between calibration prompts
 MOTION_HISTORY_MAX = 3000 # max length of motion history deque
 
+MODEL_NAME = "mlp_model_norm.pt"
+
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 
@@ -135,9 +137,10 @@ def main():
     prev_time = 0
     num_signs = 0
     letter = ""
+    percent = 0.0
 
     # Load model
-    model = torch.load("mlp_model_norm.pt")
+    model = torch.load(MODEL_NAME)
 
     # Mediapipe Hands setup
     with mp_hands.Hands(
@@ -228,7 +231,9 @@ def main():
                                 output = model(torch.tensor(embedding, dtype=torch.float32))
                                 _, predicted = torch.max(output, 0)
                                 letter = letter_mapping[int(predicted)]
+                                percent = torch.max(torch.softmax(output, dim=0), 0).values
                                 print(f"Predicted letter: {letter}")
+                                print(f"Confidence: {percent}")
                         else:
                             end_counter = 0
                         if in_segment:
@@ -242,8 +247,12 @@ def main():
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
 
                 # predicted letter
-                cv2.putText(frame, f"Letter: {letter}", (frame_w - 200, frame_h - 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
+                if percent >= 0.8:
+                    cv2.putText(frame, f"Letter: {letter}", (frame_w - 200, frame_h - 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
+                else:
+                    cv2.putText(frame, f"Letter: ?", (frame_w - 200, frame_h - 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
 
                 frame_idx += 1
                 # calc / rep FPS
