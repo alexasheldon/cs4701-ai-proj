@@ -20,6 +20,7 @@ CAL_INTERVAL = 5  # seconds between calibration prompts
 MOTION_HISTORY_MAX = 3000 # max length of motion history deque
 
 MODEL_NAME = "mlp_model_norm.pt"
+CONFIDENCE_THRESH = 0.8
 
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
@@ -247,12 +248,12 @@ def main():
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
 
                 # predicted letter
-                if percent >= 0.8:
-                    cv2.putText(frame, f"Letter: {letter}", (frame_w - 200, frame_h - 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
+                if percent >= CONFIDENCE_THRESH:
+                    letter_text = f"Letter: {letter}"
                 else:
-                    cv2.putText(frame, f"Letter: ?", (frame_w - 200, frame_h - 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
+                    letter_text = "Letter: ?"
+                cv2.putText(frame, letter_text, (frame_w - 200, frame_h - 30),
+                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
 
                 frame_idx += 1
                 # calc / rep FPS
