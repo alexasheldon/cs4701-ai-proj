@@ -2,6 +2,7 @@ import time
 import cv2
 import mediapipe as mp
 import numpy as np
+import torch
 from collections import deque
 
 CAM_INDEX = 0
@@ -72,6 +73,33 @@ def motion_energy(curr_lm, prev_lm):
 #     end_thresh = p50
 #     return {"p50" : p50, "p90" : p90, "start_thresh": start_thresh, "end_thresh": end_thresh}
 
+letter_mapping = {
+        0 :'A',
+        1 :'B',
+        2 :'C',
+        3 :'D',
+        4 :'E',
+        5 :'F',
+        6 :'G',
+        7 :'H',
+        8 :'I',
+        9 :'K',
+        10 :'L',
+        11 :'M',
+        12 :'N',
+        13 :'O',
+        14 :'P',
+        15 :'Q',
+        16 :'R',
+        17 :'S',
+        18 :'T',
+        19 :'U',
+        20 :'V',
+        21 :'W',
+        22 :'X',
+        23 :'Y'
+    }
+
 def main():
     global START_THRESH, END_THRESH, DEBOUNCE_START, DEBOUNCE_END # make editable later
 
@@ -106,6 +134,10 @@ def main():
     frames = 0
     prev_time = 0
     num_signs = 0
+    letter = ""
+
+    # Load model
+    model = torch.load("mlp_model_norm.pt")
 
     # Mediapipe Hands setup
     with mp_hands.Hands(
@@ -191,6 +223,12 @@ def main():
                                 num_signs += 1
                                 print(f"Total signs captured: {num_signs}")
                                 seg_frames = []
+
+                                # run model on embedding
+                                output = model(torch.tensor(embedding, dtype=torch.float32))
+                                _, predicted = torch.max(output, 0)
+                                letter = letter_mapping[int(predicted)]
+                                print(f"Predicted letter: {letter}")
                         else:
                             end_counter = 0
                         if in_segment:
@@ -201,6 +239,10 @@ def main():
                 # how many signs have been detected
                 frame_h, frame_w, _ = frame.shape
                 cv2.putText(frame, f"Signs: {num_signs}", (frame_w - 200, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
+
+                # predicted letter
+                cv2.putText(frame, f"Letter: {letter}", (frame_w - 200, frame_h - 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
 
                 frame_idx += 1
