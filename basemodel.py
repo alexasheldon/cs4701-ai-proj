@@ -6,7 +6,6 @@ import torch
 from torch.utils.data import DataLoader, random_split, Subset
 import torchvision
 import torchvision.transforms as transforms
-import numpy as np
 import kagglehub
 from tqdm import tqdm
 import matplotlib.pyplot as plt
