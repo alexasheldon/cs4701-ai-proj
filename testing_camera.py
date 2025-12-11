@@ -9,8 +9,8 @@ CAM_INDEX = 0
 WINDOW_NAME = "MediaPipe Hands - press q to quit, s to save"
 
 # default threshold for detecting gesture start / end
-START_THRESH = 0.015
-END_THRESH = 0.010 # originally 0.010 (less than START THRESH)
+START_THRESH = 0.015 # originally 0.015
+END_THRESH = 0.010 # originally 0.010 (must be less than START THRESH)
 DEBOUNCE_START = 3
 DEBOUNCE_END = 3 # originally 8
 SMOOTH_WINDOW = 7 # originally 5
@@ -20,7 +20,9 @@ CAL_INTERVAL = 5  # seconds between calibration prompts
 MOTION_HISTORY_MAX = 3000 # max length of motion history deque
 
 MODEL_NAME = "mlp_model_norm.pt"
-CONFIDENCE_THRESH = 0.8
+
+model_in_h = 512
+model_in_w = 513
 
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
@@ -50,31 +52,6 @@ def motion_energy(curr_lm, prev_lm):
         print("Invalid input to motion_energy: curr_lm or prev_lm is not 2D")
         return 0  # Return zero motion energy for invalid landmarks
     return np.mean(np.linalg.norm(curr_lm - prev_lm, axis=1))
-
-# def draw_indicator(frame, text, color=(0,200,0)):
-#     h, w = frame.shape[:2]
-#     overlay = frame.copy()
-#     cv2.rectangle(overlay, (0,0), (w,40), color, -1)
-#     alpha = 0.35
-#     cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
-#     cv2.putText(frame, text, (10, 34),
-#                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,255), 2)
-    
-# # convert seconds and fps to frame count
-# def secs_to_frames(s, fps):
-#     return max(1, int(round(s * fps)))
-
-# # suggest thresholds based on motion history
-# def suggest_thresholds(motion_vals):
-#     if len(motion_vals)<30:
-#         return None
-#     motion_vals_arr = np.array(motion_vals)
-#     p50 = np.percentile(motion_vals_arr, 50)
-#     p90 = np.percentile(motion_vals_arr, 90)
-#     # could add more percentiles
-#     start_thresh = p90
-#     end_thresh = p50
-#     return {"p50" : p50, "p90" : p90, "start_thresh": start_thresh, "end_thresh": end_thresh}
 
 letter_mapping = {
         0 :'A',
@@ -141,7 +118,7 @@ def main():
     percent = 0.0
 
     # Load model
-    model = torch.load(MODEL_NAME)
+    model = torch.load(MODEL_NAME, weights_only=False)
 
     # Mediapipe Hands setup
     with mp_hands.Hands(
@@ -181,7 +158,26 @@ def main():
                             mp_hands.HAND_CONNECTIONS,
                             mp_drawing.DrawingSpec(color=(0,255,0), thickness=2, circle_radius=3),
                             mp_drawing.DrawingSpec(color=(0,0,255), thickness=2))
+                    h, w, c = frame.shape
+            
+                    # Collect pixel coordinates for bounding box
+                    x_coords = [int(lm.x * w) for lm in hand_landmarks.landmark]
+                    y_coords = [int(lm.y * h) for lm in hand_landmarks.landmark]
                     
+                    # Bounding box
+                    x_min, x_max = min(x_coords), max(x_coords)
+                    y_min, y_max = min(y_coords), max(y_coords)
+                    
+                    # Crop the hand region to send to CNN
+                    cropped_hand = frame[y_min:y_max, x_min:x_max]
+                    cv2.imshow("Cropped Hand", cropped_hand) # show cropped hand
+                    cropped_resized = cv2.resize(cropped_hand, (model_in_h, model_in_w)) # resize to model input size
+                    # cropped_tensor = torch.from_numpy(cropped_resized).float() / 255.0 # normalize to [0,1]
+                    # cropped_tensor_reorder = cropped_tensor.permute(2, 0, 1) # change to (Channels, Height, Width) from (H,W,C)
+                    # cropped_input = cropped_tensor_reorder.unsqueeze(0) # adding batch dimension (though this can be done with tensor too)
+                    # predication = cnn_model(cropped_input) # run through CNN model
+
+
                     # normalize landmarks and calculation motion energy
                     curr_lm = normalize_landmarks(hand_landmarks)
 
