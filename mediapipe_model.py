@@ -2,12 +2,15 @@ import torch
 from tqdm import tqdm
 import kagglehub
 import numpy as np
+import pandas as pd
 from torch.utils.data import DataLoader, random_split
 import torchvision
 import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.optim as optim 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 import mediapipe as mp
 from mediapipe.tasks import python
@@ -152,7 +155,7 @@ def get_embeddings(loader):
         for f in tqdm(as_completed(futures), total=len(futures)):
             dat_batch, labels_batch = f.result()
             dat_mp.append(torch.cat(dat_batch, dim=0))
-            labels_mp.append(labels_batch)
+            labels_mp.append(torch.tensor(labels_batch))
 
     return dat_mp, labels_mp
 
@@ -191,7 +194,7 @@ def train_model(mlp_model, dat_mp, labels_mp, NUM_EPOCH=50):
     for epoch in tqdm(range(NUM_EPOCH)):
         curr_loss = 0
         for i, hand_lm in enumerate(dat_mp): # enumerate in batch size
-            labels_batch = torch.tensor(labels_mp[i])
+            labels_batch = labels_mp[i]
             hand_lm = hand_lm.view(hand_lm.size(0), -1)     # flatten embedding
 
             optimizer.zero_grad()
@@ -216,7 +219,7 @@ def evaluate_model(mlp_model, dat_mp, labels_mp, mode = "Validation"):
     total = 0
 
     for i, hand_lm in tqdm(enumerate(dat_mp)):
-        labels_batch = torch.tensor(labels_mp[i])
+        labels_batch = labels_mp[i]
         hand_lm = hand_lm.view(hand_lm.size(0), -1)
 
         outputs = mlp_model(hand_lm)
@@ -225,7 +228,10 @@ def evaluate_model(mlp_model, dat_mp, labels_mp, mode = "Validation"):
         correct += (predicted == labels_batch).sum().item()
         total += labels_batch.shape[0]
 
-    print("{mode} Accuracy: " + str(correct / total))
+    accuracy = correct / total
+    print("{mode} Accuracy: " + str(accuracy))
+
+    return accuracy
 
 def per_class_accuracy(dat, mlp_model, dat_mp, labels_mp):
     reverse_map = {dat.class_to_idx[c]: c for c in dat.class_to_idx.keys()}
@@ -235,7 +241,7 @@ def per_class_accuracy(dat, mlp_model, dat_mp, labels_mp):
     mlp_model.eval()
     with torch.no_grad():
         for i, hand_lm in tqdm(enumerate(dat_mp)):
-            labels_batch = torch.tensor(labels_mp[i])
+            labels_batch = labels_mp[i]
             hand_lm = hand_lm.view(hand_lm.size(0), -1)
 
             outputs = mlp_model(hand_lm)
@@ -250,6 +256,43 @@ def per_class_accuracy(dat, mlp_model, dat_mp, labels_mp):
     for c,acc in class_accuracy.items():
         print(f"{c} Accuracy: {acc:.2%}")
 
+    return class_accuracy
+
+def get_pred_labels(mlp_model, dat_mp):
+    pred_labels = []
+
+    for hand_lm in tqdm(dat_mp):
+        hand_lm = hand_lm.view(hand_lm.size(0), -1)
+
+        outputs = mlp_model(hand_lm)
+        _, predicted = torch.max(outputs, 1)
+        pred_labels.append(predicted)
+
+    return pred_labels
+
+def plot_confusion_matrix(true_labels, pred_labels, class_names):
+    cm = confusion_matrix(true_labels, pred_labels)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
+    disp.plot(cmap=plt.cm.Blues)
+
+    for text in disp.text_.ravel():
+        text.set_fontsize(7)
+
+    plt.show()
+
+def get_wrong_predictions(letter, pred_labels, true_labels, dat, reverse_map):
+    label_num = dat.class_to_idx[letter]
+    letter_preds = pred_labels[np.where(true_labels == label_num)[0]]
+    wrong_preds = letter_preds[torch.nonzero(letter_preds != label_num).squeeze()]
+
+    vals, counts = torch.unique(wrong_preds, return_counts=True)
+
+    mapped = []
+    for x in vals:
+        mapped.append(reverse_map[int(x)])
+
+    res = pd.DataFrame(np.array(counts), mapped, columns=[letter])
+    return res.sort_values(by=letter, ascending = False)
 
 # Save/Load Model
 def save_model(mlp_model, model_name):
