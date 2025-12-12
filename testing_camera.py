@@ -21,6 +21,7 @@ MOTION_HISTORY_MAX = 3000 # max length of motion history deque
 
 CNN_MODEL_NAME = "models/cnn_model_3.pt"
 MODEL_NAME = "models/mlp_model_norm.pt"
+
 CONFIDENCE_THRESH = 0.0
 
 model_in_h = 200

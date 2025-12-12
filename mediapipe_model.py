@@ -19,18 +19,26 @@ from mediapipe.framework.formats import landmark_pb2
 from mediapipe.python.solutions import drawing_utils, hands
 
 # Load Data
-def download_dataset():
+def download_dataset_synthetic():
     # Download latest version of data
     path = kagglehub.dataset_download("lexset/synthetic-asl-alphabet")
     print("Path to dataset files:", path)
     return path
 
+def download_dataset():
+    # Download latest version
+    path = kagglehub.dataset_download("grassknoted/asl-alphabet")
+    print("Path to dataset files:", path)
+    return path
+
 def initialize_transformation(): 
-    # Initialize transformation: format as tensor, normalize
-    return transforms.Compose([transforms.ToTensor()])
+    # Initialize transformation: format as tensor
+    return transforms.Compose([
+        transforms.ToTensor()
+        ])
 
 def initialize_transformation_noise(): 
-    # Initialize transformation: format as tensor, normalize
+    # Initialize transformation: format as tensor
     return transforms.Compose([
         transforms.RandomRotation(15), # randomly rotates some images by up to 15 degrees
         transforms.ColorJitter(brightness=0.2, contrast=0.2), # randomly changes the brightness, contrast, saturation, and hue of an image
@@ -40,21 +48,7 @@ def initialize_transformation_noise():
         transforms.ToTensor(),
         ])
 
-def preprocess_dataset(path, transform_tr):
-    # Load data folder
-    dat = torchvision.datasets.ImageFolder(
-        root = path + "/Train_Alphabet",
-        transform = transform_tr)
-    
-    # Subset Data
-    # Drop Blank, J, and Z
-    to_drop = ['Blank','J','Z']
-
-    dat.imgs = dat.imgs[0:2*900] + [i for i in dat.imgs[3*900:10*900]] + [i for i in dat.imgs[11*900:26*900]]
-    dat.samples = dat.samples[0:2*900] + [(i,l-1) for i,l in dat.samples[3*900:10*900]] + [(i,l-2) for i,l in dat.samples[11*900:26*900]]
-    dat.targets = dat.targets[0:2*900] + [i-1 for i in dat.targets[3*900:10*900]] + [i-2 for i in dat.targets[11*900:26*900]]
-    dat.classes = [i for i in dat.classes if i not in to_drop ]
-
+def assign_mapping(dat):
     dat.class_to_idx = {
         'A': 0,
         'B': 1,
@@ -81,15 +75,46 @@ def preprocess_dataset(path, transform_tr):
         'X': 22,
         'Y': 23
     }
+
+def preprocess_dataset_synthetic(path, transform_tr):
+    # Load data folder
+    dat = torchvision.datasets.ImageFolder(
+        root = path + "/Train_Alphabet",
+        transform = transform_tr)
+    
+    # Drop Blank, J, and Z
+    to_drop = ['Blank','J','Z']
+
+    dat.imgs = dat.imgs[0:2*900] + [i for i in dat.imgs[3*900:10*900]] + [i for i in dat.imgs[11*900:26*900]]
+    dat.samples = dat.samples[0:2*900] + [(i,l-1) for i,l in dat.samples[3*900:10*900]] + [(i,l-2) for i,l in dat.samples[11*900:26*900]]
+    dat.targets = dat.targets[0:2*900] + [i-1 for i in dat.targets[3*900:10*900]] + [i-2 for i in dat.targets[11*900:26*900]]
+    dat.classes = [i for i in dat.classes if i not in to_drop ]
+
+    assign_mapping(dat)
+
     return dat
 
-def test_train_split(dat, BATCH_SIZE=64):
-    len(dat.targets) == len(dat.samples) and len(dat.targets) == len(dat.imgs) and len(dat.imgs) == len(dat) and len(dat) == 900*25
-    len(dat.classes) == 25
-    # Split data
-    ratio_tr = 0.8
-    #ratio_val = 0.2
+def preprocess_dataset(path, transform_tr):
+    # Load data folder
+    dat = torchvision.datasets.ImageFolder(
+        root = path + "/asl_alphabet_train/asl_alphabet_train",
+        transform = transform_tr)
+    
+    # Drop Blank, J, and Z
+    to_drop = ['J','Z','nothing','del','space']
 
+    dat.imgs = dat.imgs[0:9*3000] + [i for i in dat.imgs[10*3000:25*3000]]
+    dat.samples = dat.samples[0:9*3000] + [(i,l-1) for i,l in dat.samples[10*3000:25*3000]]
+    dat.targets = dat.targets[0:9*3000] + [i-1 for i in dat.targets[10*3000:25*3000]]
+    dat.classes = [i for i in dat.classes if i not in to_drop ]
+
+    assign_mapping(dat)
+
+    return dat
+
+
+def test_train_split(dat, ratio_tr = 0.8, BATCH_SIZE=64):
+    # Split data
     size_tr = int(len(dat) * ratio_tr)
     size_val = len(dat) - size_tr
 
@@ -100,6 +125,18 @@ def test_train_split(dat, BATCH_SIZE=64):
     loader_val = DataLoader(dat_val, batch_size=BATCH_SIZE, shuffle = False)
 
     return loader_tr, loader_val
+
+def display_image(loader_tr, i=0):
+    # Present image
+    images, labels = next(iter(loader_tr))
+
+    img = images[i].squeeze()
+    img = img.permute(1, 2, 0)  
+    label = labels[i]
+
+    plt.imshow(img)
+    plt.show()
+    print(f"Label: {label}")
 
 
 # Format Data
@@ -235,8 +272,8 @@ def evaluate_model(mlp_model, dat_mp, labels_mp, mode = "Validation"):
 
 def per_class_accuracy(dat, mlp_model, dat_mp, labels_mp):
     reverse_map = {dat.class_to_idx[c]: c for c in dat.class_to_idx.keys()}
-    correct = {c:0 for c in dat.classes}
-    total = {c:0 for c in dat.classes}
+    correct = {c:0 for c in dat.class_to_idx.keys()}
+    total = {c:0 for c in dat.class_to_idx.keys()}
 
     mlp_model.eval()
     with torch.no_grad():
