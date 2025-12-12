@@ -19,7 +19,9 @@ MIN_SEG_FRAMES = 6
 CAL_INTERVAL = 5  # seconds between calibration prompts
 MOTION_HISTORY_MAX = 3000 # max length of motion history deque
 
+CNN_MODEL_NAME = "cnn_model_2.pt"
 MODEL_NAME = "mlp_model_norm.pt"
+CONFIDENCE_THRESH = 0.0
 
 model_in_h = 512
 model_in_w = 513
@@ -114,10 +116,11 @@ def main():
     frames = 0
     prev_time = 0
     num_signs = 0
-    letter = ""
+    letter = "?"
     percent = 0.0
 
     # Load model
+    cnn_model = torch.load(CNN_MODEL_NAME)
     model = torch.load(MODEL_NAME, weights_only=False)
 
     # Mediapipe Hands setup
@@ -168,15 +171,17 @@ def main():
                     x_min, x_max = min(x_coords), max(x_coords)
                     y_min, y_max = min(y_coords), max(y_coords)
                     
-                    # Crop the hand region to send to CNN
-                    cropped_hand = frame[y_min:y_max, x_min:x_max]
-                    cv2.imshow("Cropped Hand", cropped_hand) # show cropped hand
-                    cropped_resized = cv2.resize(cropped_hand, (model_in_h, model_in_w)) # resize to model input size
+                    # # Crop the hand region to send to CNN
+                    # cropped_hand = frame[y_min:y_max, x_min:x_max]
+                    # cv2.imshow("Cropped Hand", cropped_hand) # show cropped hand
+                    # cropped_resized = cv2.resize(cropped_hand, (model_in_h, model_in_w)) # resize to model input size
                     # cropped_tensor = torch.from_numpy(cropped_resized).float() / 255.0 # normalize to [0,1]
+                    # cropped_tensor = (cropped_tensor - 0.5) / 0.5 # normallize to [-1,1]
                     # cropped_tensor_reorder = cropped_tensor.permute(2, 0, 1) # change to (Channels, Height, Width) from (H,W,C)
                     # cropped_input = cropped_tensor_reorder.unsqueeze(0) # adding batch dimension (though this can be done with tensor too)
-                    # predication = cnn_model(cropped_input) # run through CNN model
-
+                    # cnn_output = cnn_model(cropped_input) # run through CNN model
+                    # _, cnn_predicted = torch.max(cnn_output, 1)
+                    # letter = letter_mapping[int(cnn_predicted)]
 
                     # normalize landmarks and calculation motion energy
                     curr_lm = normalize_landmarks(hand_landmarks)
@@ -220,6 +225,20 @@ def main():
                                 # TODO: actually pass emebedding to model for classification
                                 embedding = np.mean(seg_frames, axis=0) # average embedding
                                 print("Embedding:", embedding)
+
+                                # Crop the hand region to send to CNN
+                                cropped_hand = frame[y_min:y_max, x_min:x_max]
+                                cv2.imshow("Cropped Hand", cropped_hand) # show cropped hand
+                                cropped_resized = cv2.resize(cropped_hand, (model_in_h, model_in_w)) # resize to model input size
+                                cropped_tensor = torch.from_numpy(cropped_resized).float() / 255.0 # normalize to [0,1]
+                                cropped_tensor = (cropped_tensor - 0.5) / 0.5 # normallize to [-1,1]
+                                cropped_tensor_reorder = cropped_tensor.permute(2, 0, 1) # change to (Channels, Height, Width) from (H,W,C)
+                                cropped_input = cropped_tensor_reorder.unsqueeze(0) # adding batch dimension (though this can be done with tensor too)
+                                cnn_output = cnn_model(cropped_input) # run through CNN model
+                                _, cnn_predicted = torch.max(cnn_output, 1)
+                                letter = letter_mapping[int(cnn_predicted)]
+                                percent = torch.max(torch.softmax(cnn_output, dim=1), 1).values
+
                                 num_signs += 1
                                 print(f"Total signs captured: {num_signs}")
                                 seg_frames = []
@@ -227,8 +246,8 @@ def main():
                                 # run model on embedding
                                 output = model(torch.tensor(embedding, dtype=torch.float32))
                                 _, predicted = torch.max(output, 0)
-                                letter = letter_mapping[int(predicted)]
-                                percent = torch.max(torch.softmax(output, dim=0), 0).values
+                                #letter = letter_mapping[int(predicted)]
+                                #percent = torch.max(torch.softmax(output, dim=0), 0).values
                                 print(f"Predicted letter: {letter}")
                                 print(f"Confidence: {percent}")
                         else:
@@ -245,10 +264,10 @@ def main():
 
                 # predicted letter
                 if percent >= CONFIDENCE_THRESH:
-                    letter_text = f"Letter: {letter}"
+                    letter_text = f"Letter: {letter}, {round(float(percent),2)}"
                 else:
                     letter_text = "Letter: ?"
-                cv2.putText(frame, letter_text, (frame_w - 200, frame_h - 30),
+                cv2.putText(frame, letter_text, (frame_w - 300, frame_h - 30),
                  cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
 
                 frame_idx += 1
