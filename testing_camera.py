@@ -24,6 +24,10 @@ MODEL_NAME = "models/mlp_model_norm.pt"
 
 CONFIDENCE_THRESH = 0.0
 
+FRAME_WIDTH = 1280
+FRAME_HEIGHT = 720
+record_video = True
+
 model_in_h = 200
 model_in_w = 200
 
@@ -97,9 +101,12 @@ def main():
         return
 
     # Setting a resolution to stabilize negotiation (my resolution)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
+    if record_video:
+        format = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter('output.mp4', format, 20.0, (FRAME_WIDTH,FRAME_HEIGHT))
+    
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
     # saved = 0
     # prev_time = time.time()
@@ -124,7 +131,7 @@ def main():
     mlp_percent = 0.0
 
     # Load model
-    cnn_model = torch.load(CNN_MODEL_NAME)
+    cnn_model = torch.load(CNN_MODEL_NAME, weights_only=False)
     model = torch.load(MODEL_NAME, weights_only=False)
 
     # Mediapipe Hands setup
@@ -300,6 +307,8 @@ def main():
                                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
 
                 cv2.imshow(WINDOW_NAME, frame)
+                if record_video:
+                    out.write(frame)
                 key = cv2.waitKey(1) & 0xFF
                 # quit key 
                 if key == ord('q'):
@@ -314,6 +323,8 @@ def main():
         except KeyboardInterrupt:
             pass
         finally:
+            if record_video:
+                out.release()
             cap.release()
             cv2.destroyAllWindows()
 
