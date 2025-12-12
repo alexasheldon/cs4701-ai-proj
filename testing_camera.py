@@ -19,12 +19,12 @@ MIN_SEG_FRAMES = 6
 CAL_INTERVAL = 5  # seconds between calibration prompts
 MOTION_HISTORY_MAX = 3000 # max length of motion history deque
 
-CNN_MODEL_NAME = "cnn_model_2.pt"
-MODEL_NAME = "mlp_model_norm.pt"
+CNN_MODEL_NAME = "models/cnn_model_3.pt"
+MODEL_NAME = "models/mlp_model_norm.pt"
 CONFIDENCE_THRESH = 0.0
 
-model_in_h = 512
-model_in_w = 513
+model_in_h = 200
+model_in_w = 200
 
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
@@ -116,8 +116,11 @@ def main():
     frames = 0
     prev_time = 0
     num_signs = 0
-    letter = "?"
-    percent = 0.0
+
+    cnn_letter = "?"
+    cnn_percent = 0.0
+    mlp_letter = "?"
+    mlp_percent = 0.0
 
     # Load model
     cnn_model = torch.load(CNN_MODEL_NAME)
@@ -154,14 +157,16 @@ def main():
                 if results.multi_hand_landmarks:
                     #print("Hand landmarks detected:", results.multi_hand_landmarks is not None) # debug print
                     # Drawing landmarks and connections
-                    for hand_landmarks in results.multi_hand_landmarks:
-                        mp_drawing.draw_landmarks(
-                            frame,
-                            hand_landmarks,
-                            mp_hands.HAND_CONNECTIONS,
-                            mp_drawing.DrawingSpec(color=(0,255,0), thickness=2, circle_radius=3),
-                            mp_drawing.DrawingSpec(color=(0,0,255), thickness=2))
+                    # for hand_landmarks in results.multi_hand_landmarks:
+                    #     mp_drawing.draw_landmarks(
+                    #         frame,
+                    #         hand_landmarks,
+                    #         mp_hands.HAND_CONNECTIONS,
+                    #         mp_drawing.DrawingSpec(color=(0,255,0), thickness=2, circle_radius=3),
+                    #         mp_drawing.DrawingSpec(color=(0,0,255), thickness=2)
+                    #         )
                     h, w, c = frame.shape
+                    hand_landmarks = results.multi_hand_landmarks[-1]
             
                     # Collect pixel coordinates for bounding box
                     x_coords = [int(lm.x * w) for lm in hand_landmarks.landmark]
@@ -236,8 +241,8 @@ def main():
                                 cropped_input = cropped_tensor_reorder.unsqueeze(0) # adding batch dimension (though this can be done with tensor too)
                                 cnn_output = cnn_model(cropped_input) # run through CNN model
                                 _, cnn_predicted = torch.max(cnn_output, 1)
-                                letter = letter_mapping[int(cnn_predicted)]
-                                percent = torch.max(torch.softmax(cnn_output, dim=1), 1).values
+                                cnn_letter = letter_mapping[int(cnn_predicted)]
+                                cnn_percent = torch.max(torch.softmax(cnn_output, dim=1), 1).values
 
                                 num_signs += 1
                                 print(f"Total signs captured: {num_signs}")
@@ -246,8 +251,8 @@ def main():
                                 # run model on embedding
                                 output = model(torch.tensor(embedding, dtype=torch.float32))
                                 _, predicted = torch.max(output, 0)
-                                #letter = letter_mapping[int(predicted)]
-                                #percent = torch.max(torch.softmax(output, dim=0), 0).values
+                                mlp_letter = letter_mapping[int(predicted)]
+                                mlp_percent = torch.max(torch.softmax(output, dim=0), 0).values
                                 print(f"Predicted letter: {letter}")
                                 print(f"Confidence: {percent}")
                         else:
@@ -263,11 +268,20 @@ def main():
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
 
                 # predicted letter
+                if cnn_percent > mlp_percent:
+                    percent = cnn_percent
+                    letter = cnn_letter
+                    model_type = "CNN"
+                else:
+                    percent = mlp_percent
+                    letter = mlp_letter
+                    model_type = "MLP"
+
                 if percent >= CONFIDENCE_THRESH:
-                    letter_text = f"Letter: {letter}, {round(float(percent),2)}"
+                    letter_text = f"Letter: {letter}, {round(float(percent),2)}, {model_type}"
                 else:
                     letter_text = "Letter: ?"
-                cv2.putText(frame, letter_text, (frame_w - 300, frame_h - 30),
+                cv2.putText(frame, letter_text, (frame_w - 500, frame_h - 30),
                  cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
 
                 frame_idx += 1
