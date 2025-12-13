@@ -8,18 +8,18 @@ from collections import deque
 CAM_INDEX = 0
 WINDOW_NAME = "Live Camera ASL Alphabet Classification - press 'q' to quit, 's' to save a screenshot"
 
-# default threshold for detecting gesture start / end
-START_THRESH = 0.03 # originally 0.015
-END_THRESH = 0.017 # originally 0.010 (must be less than START THRESH)
-DEBOUNCE_START = 3
-DEBOUNCE_END = 3 # originally 8
-SMOOTH_WINDOW = 5 # originally 5
+# thresholds for detecting gesture start / end
+START_THRESH = 0.03 # the motion energy level it needs to be above to start
+END_THRESH = 0.017 # the motion energy level it needs to be below to start (must be less than START THRESH)
+DEBOUNCE_START = 3 # the number of times motion energy must be above START_THRESH before beginning a sign
+DEBOUNCE_END = 3 # the number of times motion energy must be below END_THRESH before beginning a sign
+SMOOTH_WINDOW = 5 # number of frames we smooth motion energy (we take the mean over them)
 MIN_SEG_FRAMES = 6 # min number of frames required for a segment to be a valid gesture
 
 CNN_MODEL_NAME = "models/cnn_model_3.pt"
 MODEL_NAME = "models/mlp_model_norm.pt"
 
-PROB_THRESHOLD = 0.0
+PROB_THRESHOLD = 0.0 # if classification probability is below this, it is unsure  
 
 FRAME_WIDTH = 1280
 FRAME_HEIGHT = 720
@@ -83,6 +83,7 @@ def motion_energy(curr_lm, prev_lm):
         return 0  # Return zero motion energy for invalid landmarks
     return np.mean(np.linalg.norm(curr_lm - prev_lm, axis=1))
 
+# draws landmarks over detected hands (easily extended to multi-hand if needed)
 def draw_landmarks(frame, results):
     for hand_landmarks in results.multi_hand_landmarks:
             mp_drawing.draw_landmarks(
@@ -92,6 +93,8 @@ def draw_landmarks(frame, results):
                 mp_drawing.DrawingSpec(color=(0,255,0), thickness=2, circle_radius=3),
                 mp_drawing.DrawingSpec(color=(0,0,255), thickness=2)
                 )
+
+# takes in a cropped hand image and outputs the CNN's letter classification
 def classify_cnn(cropped_hand, cnn_model):
     cropped_resized = cv2.resize(cropped_hand, (model_in_h, model_in_w)) # resize to model input size
     cropped_tensor = torch.from_numpy(cropped_resized).float() / 255.0 # normalize to [0,1]
@@ -104,7 +107,15 @@ def classify_cnn(cropped_hand, cnn_model):
     cnn_percent = torch.max(torch.softmax(cnn_output, dim=1), 1).values.item()
     return cnn_letter,cnn_percent
 
+# method that runs the camera
 def live_camera(record_video=False):
+    """
+    Runs live camera feed with Mediapipe overlay, both CNN and MLP classification overlays.
+    Also shows cropped image of hand sent to CNN in another window.
+    
+    args:
+        record_video: boolean flag for if the video feed should be recorded (true) and saved to `output.mp4`
+    """
     # Open with AVFoundation to use Continuity Camera (iPhone)
     cap = cv2.VideoCapture(CAM_INDEX, cv2.CAP_AVFOUNDATION)
 
@@ -127,7 +138,6 @@ def live_camera(record_video=False):
     # state for debounce and motion
     prev_lm = None
     motion_buf = deque(maxlen=SMOOTH_WINDOW)
-    # motion_history = deque(maxlen=MOTION_HISTORY_MAX)
     in_segment = False
     seg_frames = []
     frame_idx = 0
@@ -175,7 +185,6 @@ def live_camera(record_video=False):
                 results = hands.process(rgb)
 
                 if results.multi_hand_landmarks:
-                    #print("Hand landmarks detected:", results.multi_hand_landmarks is not None) # debug print
                     # Drawing landmarks and connections
                     frame_no_lm = frame.copy() # copy without drawing
                     draw_landmarks(frame, results)
@@ -188,10 +197,8 @@ def live_camera(record_video=False):
                     y_coords = [int(lm.y * h) for lm in hand_landmarks.landmark]
                     
                     # Bounding box
-                    # x_min, x_max = max(0, min(x_coords) - 30), min(max(x_coords) + 30, w) # not congruent with CNN - allows padding
-                    # y_min, y_max = max(0, min(y_coords) - 30), min(max(y_coords) + 30, h) # not congruent with CNN - allows padding
-                    x_min, x_max = min(x_coords), max(x_coords) 
-                    y_min, y_max = min(y_coords), max(y_coords) 
+                    x_min, x_max = max(0, min(x_coords) - 30), min(max(x_coords) + 30, w) # allows padding
+                    y_min, y_max = max(0, min(y_coords) - 30), min(max(y_coords) + 30, h) # allows padding
 
                     # normalize landmarks and calculation motion energy
                     curr_lm = normalize_landmarks(hand_landmarks)
@@ -203,21 +210,17 @@ def live_camera(record_video=False):
 
                     if prev_lm is not None:
                         m_energy = motion_energy(curr_lm, prev_lm)
-                        #print(f"Motion energy: {m_energy}") # debug print
                         motion_buf.append(m_energy)
 
                         # smoothed motion
                         smooth_m_energy = np.mean(motion_buf)
-                        #print(f"Smoothed motion energy: {smooth_m_energy}")
 
                         # start detection
                         if not in_segment and smooth_m_energy > START_THRESH:
-                            print(f"Start condition met: {smooth_m_energy} > {START_THRESH}")
                             start_counter += 1
-                            #print(f"Start counter incrementing: {start_counter}")
+                            print(f"Start condition met ({start_counter} / {DEBOUNCE_START}): {smooth_m_energy} > {START_THRESH}")
                             if start_counter >= DEBOUNCE_START:
                                 in_segment = True
-                                #print(f"in_segment: {in_segment}")
                                 seg_frames = [curr_flat]
                                 print(f"Sign started at frame {frame_idx}")
                         else: 
@@ -225,14 +228,13 @@ def live_camera(record_video=False):
                         
                         # end detection
                         if in_segment and smooth_m_energy < END_THRESH:
-                            print(f"End condition met: {smooth_m_energy} < {END_THRESH}")
                             end_counter += 1
-                            print(f"End counter incrementing: {end_counter}")
+                            print(f"End condition met ({end_counter} / {DEBOUNCE_END}): {smooth_m_energy} < {END_THRESH}")
                             if end_counter >= DEBOUNCE_END:
                                 in_segment = False
                                 print(f"Sign ended at frame {frame_idx}, length: {len(seg_frames)} frames")
                                 embedding = np.mean(seg_frames, axis=0) # average embedding
-                                print("Embedding:", embedding)
+                                # print("Embedding:", embedding)
 
                                 # Crop the hand region to send to CNN
                                 cropped_hand = frame_no_lm[y_min:y_max, x_min:x_max]
@@ -284,6 +286,7 @@ def live_camera(record_video=False):
                     cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,0), 2)
                 
                 frame_idx += 1
+
                 # calculate and represent FPS
                 frames += 1
                 curr = time.time()
@@ -320,5 +323,5 @@ def live_camera(record_video=False):
             cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    record_video = False
+    record_video = False # when true, it records a video of camera feed to `output.mp4``
     live_camera(record_video=record_video)
