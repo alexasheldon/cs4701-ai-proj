@@ -3,10 +3,10 @@
 
 **Authors: Bella Falkenberg and Alexa Sheldon**
 
-This project implements a Multi-Layer Perceptron (MLP) and a Convolutional Neural Network (CNN) to classify letters from the ASL hand sign alphabet from a live camera feed.
+This project implements a Multi-Layer Perceptron and a Convolutional Neural Network to classify letters from the ASL hand sign alphabet from a live camera feed.
 
 ## Features
-- **Live Camera**: uses your computer's camera (or your iPhone) for live feed.
+- **Live Camera**: uses your computer's camera (or your iPhone) for live feed, overlaying classification from both MLP and CNN models.
 - **Multi-Layer Perceptron (MLP) Classification**: trained on hand embeddings from Mediapipe to make classifications of ASL fingerspelling alphabet.
 - **Convolutional Neural Network (CNN) Classification**: trained on cropped images based on locations of `MediaPipe` landmarks to make classifications of ASL fingerspelling alphabet.
 - **MediaPipe Hand Skeleton Overlay**: draws `MediaPipe` landmarks over your hand in frame.
@@ -66,12 +66,13 @@ python live_camera.py
 
 ## How to Use Live Camera
 Feel free to update global variables as needed.
-- **CAM_INDEX**: currently set to 0, but your computer may not have a camera at index 0 (most do, but may be denied permissions)
+- **CAM_INDEX**: currently set to 0, but your computer may not have a camera at index 0. Most computers do, and sometimes Apple computers will pull up camera feed from your phone. If it's not working, feel free to change the index, but usually the blocker is allowing permission for access.
 - **FRAME_WIDTH** and **FRAME_HEIGHT**: currently set to 1280 x 720, but you can alter this to be a better resolution for you
 - **record_video** (not a global variable): boolean indicating whether you'd like to record and save a video of the live camera feed. You can find it at the bottom of the code.
 
 ## Acknowledgments
 - Makes use of `MediaPipe` (tracking hand landmarks) and `opencv` (capturing video)
+- The CNN and MLP were trained on [this synthetic dataset](https://www.kaggle.com/datasets/lexset/synthetic-asl-alphabet).
 - This project was developed with teaching/assistance from Copilot and Chat-GPT.
 
 ---
