@@ -1,2 +1,4 @@
 cs4701-venv/
 cs4701-env/
+__pycache__/
+.DS_Store
