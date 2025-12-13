@@ -3,13 +3,14 @@
 
 **Authors: Bella Falkenberg and Alexa Sheldon**
 
-This project implements a MLP and a CNN to live classify letters from the ASL hand sign alphabet from a live camera feed.
+This project implements a Multi-Layer Perceptron (MLP) and a Convolutional Neural Network (CNN) to classify letters from the ASL hand sign alphabet from a live camera feed.
 
 ## Features
 - **Live Camera**: uses your computer's camera (or your iPhone) for live feed.
 - **Multi-Layer Perceptron (MLP) Classification**: trained on hand embeddings from Mediapipe to make classifications of ASL fingerspelling alphabet.
-- **Convolutional Neural Network (CNN) Classification**: trained on cropped images based on locations of Mediapipe landmarks to make classifications of ASL fingerspelling alphabet.
-- **Mediapipe Hand Skeleton Overlay**: draws `Mediapipe` landmarks over your hand in frame.
+- **Convolutional Neural Network (CNN) Classification**: trained on cropped images based on locations of `MediaPipe` landmarks to make classifications of ASL fingerspelling alphabet.
+- **MediaPipe Hand Skeleton Overlay**: draws `MediaPipe` landmarks over your hand in frame.
+![Letter A in ASL](letter_A_w_overlay.png)
 
 ## Setup Instructions
 ### 1. Clone the repository (different for windows)
@@ -22,7 +23,7 @@ cd cs4701-ai-proj
 xcode-select --install
 ```
 ### 3. Install Miniforge (how we set up conda)
-Make sure you download the correct one for your architecture. You can also go to [release page](https://github.com/conda-forge/miniforge/releases) if you have a different architecture (notably not Mac) to get one that matches with your computer.
+Make sure you download the correct one for your architecture. You can also go to the [release page](https://github.com/conda-forge/miniforge/releases) if you have a different architecture (notably not Mac) to get one that matches with your computer.
 Make sure you both download and run it to be able to make sure of it.
 ```bash
 uname -m
@@ -70,7 +71,7 @@ Feel free to update global variables as needed.
 - **record_video** (not a global variable): boolean indicating whether you'd like to record and save a video of the live camera feed. You can find it at the bottom of the code.
 
 ## Acknowledgments
-- Makes use of `Mediapipe` (tracking hand landmarks) and `opencv` (capturing video)
-- This project was developed with teaching/assistance from Copilot.
+- Makes use of `MediaPipe` (tracking hand landmarks) and `opencv` (capturing video)
+- This project was developed with teaching/assistance from Copilot and Chat-GPT.
 
 ---
