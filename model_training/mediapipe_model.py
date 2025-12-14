@@ -176,7 +176,7 @@ def process_batch(images, labels, detector):
     return dat_batch, labels_batch
 
 def get_embeddings(loader):
-    base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
+    base_options = python.BaseOptions(model_asset_path='../hand_landmarker.task')
     options = vision.HandLandmarkerOptions(base_options=base_options)
     detector = vision.HandLandmarker.create_from_options(options)
 
