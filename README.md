@@ -11,6 +11,7 @@ This project implements a Multi-Layer Perceptron and a Convolutional Neural Netw
 - **Convolutional Neural Network (CNN) Classification**: trained on cropped images based on locations of `MediaPipe` landmarks to make classifications of ASL fingerspelling alphabet.
 - **MediaPipe Hand Skeleton Overlay**: draws `MediaPipe` landmarks over your hand in frame.
 ![Letter A in ASL](letter_A_w_overlay.png)
+![Live Demo GIF](signingB.gif)
 
 ## Setup Instructions
 ### 1. Clone the repository (different for windows)
